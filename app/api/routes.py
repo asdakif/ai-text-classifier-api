@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.schemas.prediction import PredictionRequest, PredictionResponse
+from app.core.security import verify_api_key
+from app.schemas.prediction import HealthResponse, ModelInfo, PredictionRequest, PredictionResponse
 from app.services.inference import InferenceService, ModelNotReadyError
 
 
@@ -13,11 +14,16 @@ def get_inference_service(request: Request) -> InferenceService:
     return request.app.state.inference_service
 
 
-@router.get("/health", summary="Health check")
-def health_check(request: Request) -> dict[str, str]:
+@router.get("/health", response_model=HealthResponse, summary="Health check")
+def health_check(request: Request) -> HealthResponse:
     service = request.app.state.inference_service
     model_status = "loaded" if service.is_loaded else "not_loaded"
-    return {"status": "ok", "model_status": model_status}
+    model_info = service.get_model_info()
+    return HealthResponse(
+        status="ok",
+        model_status=model_status,
+        model=ModelInfo(**model_info) if model_info else None,
+    )
 
 
 @router.post(
@@ -28,6 +34,7 @@ def health_check(request: Request) -> dict[str, str]:
 )
 def predict(
     payload: PredictionRequest,
+    _: None = Depends(verify_api_key),
     inference_service: InferenceService = Depends(get_inference_service),
 ) -> PredictionResponse:
     try:
@@ -46,4 +53,5 @@ def predict(
         label=result.label,
         confidence=result.confidence,
         probabilities=result.probabilities,
+        model=ModelInfo(**result.model_info),
     )

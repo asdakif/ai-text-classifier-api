@@ -5,13 +5,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.routes import router
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
+from app.core.middleware import configure_logging, create_request_middleware
 from app.services.inference import InferenceService, ModelNotReadyError
 
 
-def create_app(inference_service: InferenceService | None = None) -> FastAPI:
-    settings = get_settings()
-    service = inference_service or InferenceService()
+def create_app(
+    inference_service: InferenceService | None = None,
+    settings: Settings | None = None,
+) -> FastAPI:
+    settings = settings or get_settings()
+    configure_logging(settings)
+    service = inference_service or InferenceService(settings=settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -34,6 +39,8 @@ def create_app(inference_service: InferenceService | None = None) -> FastAPI:
     )
 
     app.state.inference_service = service
+    app.state.settings = settings
+    app.middleware("http")(create_request_middleware(settings))
     app.include_router(router)
     return app
 

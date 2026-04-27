@@ -22,6 +22,10 @@ class Settings:
     model_artifact_path: Path
     dataset_path: Path
     max_sequence_length: int
+    api_key: str | None
+    rate_limit_requests: int
+    rate_limit_window_seconds: int
+    log_level: str
 
 
 def get_settings() -> Settings:
@@ -43,4 +47,8 @@ def get_settings() -> Settings:
         model_artifact_path=model_path,
         dataset_path=dataset_path,
         max_sequence_length=int(os.getenv("MAX_SEQUENCE_LENGTH", "32")),
+        api_key=os.getenv("API_KEY"),
+        rate_limit_requests=int(os.getenv("RATE_LIMIT_REQUESTS", "20")),
+        rate_limit_window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
+        log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
     )

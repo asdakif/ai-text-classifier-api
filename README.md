@@ -10,7 +10,10 @@ This project demonstrates how to package a machine learning model as an API serv
 - A PyTorch bag-of-words neural network for sentiment-style text classification
 - Shared preprocessing logic between training and inference
 - A training pipeline that creates a reusable model artifact
+- Request timing, request IDs, and lightweight rate limiting for production-minded API behavior
+- Optional API key protection for the prediction endpoint
 - API tests with `pytest`
+- GitHub Actions CI for automated training and test validation
 - Docker support for containerized execution
 
 ## Tech Stack
@@ -34,7 +37,9 @@ ai-text-classifier-api/
 │   ├── api/
 │   │   └── routes.py
 │   ├── core/
-│   │   └── config.py
+│   │   ├── config.py
+│   │   ├── middleware.py
+│   │   └── security.py
 │   ├── models/
 │   │   └── classifier.py
 │   ├── schemas/
@@ -50,6 +55,9 @@ ai-text-classifier-api/
 │   └── preprocess.py
 ├── tests/
 │   └── test_api.py
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── requirements.txt
 ├── Dockerfile
 ├── README.md
@@ -78,6 +86,17 @@ python -m training.train
 ```
 
 This command trains a lightweight text classifier on the included sample dataset and saves the artifact to `data/artifacts/text_classifier.pt`.
+
+### Optional environment variables
+
+```bash
+export API_KEY="your-secret-key"
+export RATE_LIMIT_REQUESTS=20
+export RATE_LIMIT_WINDOW_SECONDS=60
+export LOG_LEVEL="INFO"
+```
+
+These settings enable simple API key protection, configurable request throttling, and application logging.
 
 ## How to Run Locally
 
@@ -113,6 +132,11 @@ curl -X POST "http://127.0.0.1:8000/predict" \
   "probabilities": {
     "negative": 0.2561,
     "positive": 0.7439
+  },
+  "model": {
+    "model_version": "0.1.0",
+    "model_type": "bag-of-words-feedforward",
+    "max_sequence_length": 32
   }
 }
 ```
@@ -120,8 +144,17 @@ curl -X POST "http://127.0.0.1:8000/predict" \
 ## Error Handling
 
 - Empty or whitespace-only text returns a validation error
+- Missing or invalid `X-API-Key` values return `401 Unauthorized` when API key protection is enabled
+- Excess requests to `/predict` return `429 Too Many Requests`
 - Missing model artifacts return a `503 Service Unavailable` response
 - Unexpected inference failures return a `500 Internal Server Error` response
+
+## Production Features
+
+- `X-Request-ID` header added to every response for traceability
+- `X-Process-Time-Ms` header added to every response for basic latency visibility
+- `/health` endpoint exposes model load status and model metadata
+- GitHub Actions workflow validates training and tests on every push and pull request
 
 ## Running Tests
 
@@ -147,8 +180,9 @@ The Docker build trains the sample model during image creation so the container 
 
 ## Future Improvements
 
-- Replace the bootstrap dataset with a larger domain-specific dataset
-- Track experiments and metrics with MLflow or Weights & Biases
-- Add model versioning and artifact storage in cloud object storage
-- Introduce CI/CD for automated testing and deployment
-- Expand to multi-class classification and transformer-based models
+- Replace the sample bootstrap dataset with a larger, domain-specific production dataset
+- Add experiment tracking and metric logging with MLflow or Weights & Biases
+- Introduce model versioning and artifact storage using cloud object storage such as Amazon S3
+- Extend the API to support multi-class classification tasks
+- Upgrade the baseline PyTorch model to transformer-based architectures such as BERT
+- Deploy the service to a cloud platform such as AWS, GCP, or Render

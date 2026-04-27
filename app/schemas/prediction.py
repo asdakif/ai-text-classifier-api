@@ -5,6 +5,12 @@ from typing import Dict
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+class ModelInfo(BaseModel):
+    model_version: str = Field(..., description="Version identifier for the loaded model artifact.")
+    model_type: str = Field(..., description="High-level architecture used for inference.")
+    max_sequence_length: int = Field(..., description="Maximum sequence length used during preprocessing.")
+
+
 class PredictionRequest(BaseModel):
     model_config = ConfigDict(json_schema_extra={"example": {"text": "I loved this product."}})
 
@@ -25,4 +31,14 @@ class PredictionResponse(BaseModel):
     probabilities: Dict[str, float] = Field(
         ...,
         description="Probability distribution across supported labels.",
+    )
+    model: ModelInfo = Field(..., description="Metadata about the currently loaded model.")
+
+
+class HealthResponse(BaseModel):
+    status: str = Field(..., description="Overall API health status.")
+    model_status: str = Field(..., description="Whether the model is loaded in memory.")
+    model: ModelInfo | None = Field(
+        default=None,
+        description="Loaded model metadata, if a model artifact is available.",
     )

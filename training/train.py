@@ -136,6 +136,11 @@ def train() -> Path:
             "num_classes": len(labels),
             "dropout": 0.2,
         },
+        "metadata": {
+            "model_version": settings.app_version,
+            "model_type": "bag-of-words-feedforward",
+            "max_sequence_length": max_length,
+        },
         "metrics": {
             "validation_loss": round(validation_loss, 4),
             "validation_accuracy": round(best_validation_accuracy, 4),

@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import torch
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.models.classifier import TextClassifier
 from app.services.preprocessing import vectorize_text
 
@@ -20,21 +19,32 @@ class PredictionResult:
     label: str
     confidence: float
     probabilities: dict[str, float]
+    model_info: dict[str, str | int]
 
 
 class InferenceService:
-    def __init__(self, artifact_path: Path | None = None) -> None:
-        settings = get_settings()
+    def __init__(self, artifact_path: Path | None = None, settings: Settings | None = None) -> None:
+        settings = settings or get_settings()
         self.artifact_path = artifact_path or settings.model_artifact_path
         self.device = torch.device("cpu")
         self.model: TextClassifier | None = None
         self.vocab: dict[str, int] = {}
         self.labels: list[str] = []
         self.max_length = settings.max_sequence_length
+        self.metadata: dict[str, str | int] = {
+            "model_version": settings.app_version,
+            "model_type": "bag-of-words-feedforward",
+            "max_sequence_length": self.max_length,
+        }
 
     @property
     def is_loaded(self) -> bool:
         return self.model is not None
+
+    def get_model_info(self) -> dict[str, str | int] | None:
+        if not self.is_loaded:
+            return None
+        return self.metadata
 
     def load(self) -> None:
         if not self.artifact_path.exists():
@@ -48,6 +58,14 @@ class InferenceService:
         self.vocab = checkpoint["vocab"]
         self.labels = checkpoint["labels"]
         self.max_length = checkpoint.get("max_length", self.max_length)
+        self.metadata = checkpoint.get(
+            "metadata",
+            {
+                "model_version": "1.0.0",
+                "model_type": "bag-of-words-feedforward",
+                "max_sequence_length": self.max_length,
+            },
+        )
 
         self.model = TextClassifier(
             input_dim=model_config["input_dim"],
@@ -79,6 +97,7 @@ class InferenceService:
             label=self.labels[top_index],
             confidence=round(float(probabilities[top_index].item()), 4),
             probabilities=probabilities_map,
+            model_info=self.metadata,
         )
 
     def _build_probability_map(self, raw_probabilities: list[float]) -> dict[str, float]:
